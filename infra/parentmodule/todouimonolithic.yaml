@@ -1,0 +1,74 @@
+name: "pipeline-revision"
+trigger: none
+pool:
+ name: "Daily-Pipeline-Agent"
+stages:
+  - stage: "terraformstage"
+    displayName: "terraformStage"
+    jobs: 
+     - job: "terraforminit"
+       displayName: "terraformInitValidatePlanApply" 
+       steps:
+
+        - task: TerraformInstaller@1
+          inputs:
+            terraformVersion: 'latest'
+
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            workingDirectory: '$(System.DefaultWorkingDirectory)'
+            backendServiceArm: 'daily-practice-scon'
+            backendAzureRmStorageAccountName: 'pardeepstg'
+            backendAzureRmContainerName: 'pardeepcon'
+            backendAzureRmKey: 'pardeep.tfstate'
+         
+       
+
+        - task: TerraformTask@5
+          displayName: "terraform Validate"
+          inputs:
+            provider: 'azurerm'
+            command: 'validate'
+            workingDirectory: '$(System.DefaultWorkingDirectory)'
+
+        - task: TerraformTask@5
+          displayName: "terraform Plan"
+          inputs:
+            provider: 'azurerm'
+            command: 'plan'
+            workingDirectory: '$(System.DefaultWorkingDirectory)'
+            environmentServiceNameAzureRM: 'daily-practice-scon'
+
+     - job: "manualvalidation"
+       displayName: "Manual Validation"
+       dependsOn: "terraforminit"
+       pool: server
+       steps:
+       - task: ManualValidation@1
+         inputs:
+           notifyUsers: 'pardeepkumar02610@gmail.com'
+           approvers: 'pardeepkumar02610@gmail.com'
+
+     - job: "terraformapply"
+       dependsOn: "manualvalidation"
+       condition: succeeded()
+       steps:
+          - task: TerraformTask@5
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              backendServiceArm: 'daily-practice-scon'
+              backendAzureRmStorageAccountName: 'pardeepstg'
+              backendAzureRmContainerName: 'pardeepcon'
+              backendAzureRmKey: 'pardeep.tfstate'
+          - task: TerraformTask@5
+            displayName: "terraform Apply"
+            inputs:
+              provider: 'azurerm'
+              command: 'apply'
+              commandOptions: '--auto-approve'
+              environmentServiceNameAzureRM: 'daily-practice-scon'
+
+      
